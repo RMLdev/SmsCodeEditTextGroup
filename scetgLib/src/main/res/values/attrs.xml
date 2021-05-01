@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="SmsCodeEditTextGroup">
+        <attr name="scetg_code_length" format="integer"/>
+        <attr name="scetg_spacing" format="dimension"/>
+        <attr name="scetg_cell_height" format="dimension"/>
+        <attr name="scetg_cell_width" format="dimension"/>
+        <attr name="scetg_textSize" format="dimension"/>
+        <attr name="scetg_textСolor" format="color"/>
+        <attr name="scetg_textColor_incorrect" format="color"/>
+        <attr name="scetg_textColor_correct" format="color"/>
+        <attr name="scetg_background" format="reference"/>
+        <attr name="scetg_background_incorrect" format="reference"/>
+        <attr name="scetg_background_correct" format="reference"/>
+        <attr name="scetg_background_focused" format="reference"/>
+        <attr name="scetg_background_filled" format="reference"/>
+    </declare-styleable>
+</resources>

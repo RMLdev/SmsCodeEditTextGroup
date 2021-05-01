@@ -1,0 +1,3 @@
+include ':scetgLib'
+include ':app'
+rootProject.name = "SmsCodeEditTextGroup"
