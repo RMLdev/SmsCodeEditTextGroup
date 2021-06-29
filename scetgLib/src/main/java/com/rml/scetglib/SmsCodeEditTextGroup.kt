@@ -252,7 +252,7 @@ class SmsCodeEditTextGroup @JvmOverloads constructor(
             editTextViews[charIndex].setText(code[charIndex].toString())
         }
         try {
-            onCodeEntered(code)
+            if (code.isNotEmpty()) onCodeEntered(code)
         } catch (e: UninitializedPropertyAccessException) {
             Log.e(
                 TAG,
@@ -285,6 +285,14 @@ class SmsCodeEditTextGroup @JvmOverloads constructor(
             it.background = incorrectBgDrawable ?: bgDrawable
             it.setTextColor(incorrectTextColor)
         }
+    }
+
+    fun resetInput() {
+        editTextViews.forEach {
+            it.setText("")
+        }
+        setDefaultInputState()
+        setCode("")
     }
 
     fun setDefaultInputState() {
