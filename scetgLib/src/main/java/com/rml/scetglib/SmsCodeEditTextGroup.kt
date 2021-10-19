@@ -24,6 +24,7 @@ import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
 import androidx.core.content.res.ResourcesCompat
 import com.rml.scetglib.extensions.dpToPx
+import com.rml.scetglib.extensions.spToPx
 
 
 class SmsCodeEditTextGroup @JvmOverloads constructor(
@@ -32,43 +33,60 @@ class SmsCodeEditTextGroup @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : ConstraintLayout(context, attrs, defStyleAttr),
     TextWatcher {
-
     private var code: String = ""
     private var inputState: Int = STATE_INPUT
     private var codeLength: Int = DEFAULT_CODE_LENGTH
     private var editTextViews: List<SmsCodeEditText>
 
+    /** отвечает за расстояние между ячейками */
+
     @Px
     private var spacing: Float = context.dpToPx(DEFAULT_SPACING)
 
+    /** ширина одной ячейки */
     @Px
     private var width: Float = context.dpToPx(DEFAULT_WIDTH)
 
+    /** высота одной ячейки */
     @Px
     private var height: Float = context.dpToPx(DEFAULT_HEIGHT)
 
+    /** размер текста в ячейке */
     @Px
-    private var textSize: Float = DEFAULT_TEXT_SIZE
+    private var textSize: Float = context.spToPx(DEFAULT_TEXT_SIZE)
 
+    /** цвет текста при правильном вводе */
     @ColorInt
     private var correctTextColor: Int = Color.GREEN
 
+    /** цвет текста при неправильном вводе */
     @ColorInt
     private var incorrectTextColor: Int = Color.RED
 
+    /** стандартный цвет текста */
     @ColorInt
     private var textColor: Int = Color.BLACK
 
+    /** стандартный фон */
     private var bgDrawable: Drawable? = null
+
+    /** фон при неправильном вводе */
     private var incorrectBgDrawable: Drawable? = null
+
+    /** фон при правильном вводе */
     private var correctBgDrawable: Drawable? = null
+
+    /** фон, когда ячейка находится в фокусе */
     private var focusedBgDrawable: Drawable? = null
+
+    /** фон, когда ячейка содержит символ */
     private var filledBgDrawable: Drawable? = null
 
-
+    /** выражение, которое будет вызвано, когда все ячейки заполнены символами
+     * устанавливается методом setOnCodeEntered() */
     private lateinit var onCodeEntered: (code: String) -> Unit
 
-
+    /** здесь сохраняются те значения, которые были описаны в XML файле */
     init {
         context.theme.obtainStyledAttributes(
             attrs,
@@ -97,7 +115,7 @@ class SmsCodeEditTextGroup @JvmOverloads constructor(
                 textSize =
                     getDimension(
                         R.styleable.SmsCodeEditTextGroup_scetg_textSize,
-                        DEFAULT_TEXT_SIZE
+                        context.spToPx(DEFAULT_TEXT_SIZE)
 
                     )
                 bgDrawable =
@@ -151,6 +169,7 @@ class SmsCodeEditTextGroup @JvmOverloads constructor(
                 recycle()
             }
         }
+        /** создаем такое количество объектов SmsCodeEditText, которое было указано в параметре codeLength и добавляем их в эту ViewGroup */
         editTextViews = List(codeLength) {
             val editText = SmsCodeEditText(context, attrs, defStyleAttr)
             addView(editText)
@@ -158,18 +177,35 @@ class SmsCodeEditTextGroup @JvmOverloads constructor(
         }
     }
 
+    lateinit var idArray: IntArray
+    lateinit var weightsArray: FloatArray
+    lateinit var set: ConstraintSet
+
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-
+        // устанавливаем тот код, который был сохранен при перевороте экрана
         for (letterIndex in code.indices) {
             editTextViews[letterIndex].setText(code[letterIndex].toString())
         }
 
-        val idArray = IntArray(codeLength) { editTextViews[it].id }
+        idArray = IntArray(codeLength) { editTextViews[it].id }
 
-        val weightsArray = FloatArray(codeLength) { 1f }
+        weightsArray = FloatArray(codeLength) { 1f }
 
-        val set = ConstraintSet()
+        set = ConstraintSet()
+        // восстанавливаем сохраненное состояние ввода
+        when (inputState) {
+            STATE_CORRECT -> setCorrectInput()
+            STATE_INCORRECT -> setIncorrectInput()
+            STATE_INPUT -> setDefaultInputState()
+        }
+    }
+
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        // узнаем размеры ячейки, которые зависят от ширины всей группы и количества ячеек
+        val w = (getWidth() / codeLength) + (spacing * (1 - codeLength) / codeLength)
+        // программно создаем HorizontalChain, которая состоит из созданных SmsCodeEditText
         set.apply {
             createHorizontalChain(
                 ConstraintSet.PARENT_ID,
@@ -184,17 +220,12 @@ class SmsCodeEditTextGroup @JvmOverloads constructor(
                 if (editText != editTextViews.last()) {
                     setMargin(editText.id, ConstraintSet.END, spacing.toInt())
                 }
-                constrainHeight(editText.id, height.toInt())
-                constrainWidth(editText.id, width.toInt())
+                constrainHeight(editText.id, w.toInt())
+                constrainWidth(editText.id, w.toInt())
             }
         }
 
         set.applyTo(this)
-        when (inputState) {
-            STATE_CORRECT -> setCorrectInput()
-            STATE_INCORRECT -> setIncorrectInput()
-            STATE_INPUT -> setDefaultInputState()
-        }
     }
 
     override fun onSaveInstanceState(): Parcelable =
@@ -214,6 +245,8 @@ class SmsCodeEditTextGroup @JvmOverloads constructor(
     override fun beforeTextChanged(p0: CharSequence?, p1: Int, p2: Int, p3: Int) {}
 
     override fun onTextChanged(input: CharSequence?, p1: Int, p2: Int, count: Int) {
+        // когда пользователь вводит символ с клавиатуры переключаем фокус с текущей ячейкеи (focusedChild)
+        // на следующую ячейку (focusingChild), если ячейка последняя вызывается метод buildCode()
         if (input != null && count == 1) {
             val focusedChildIndex = editTextViews.indexOf(focusedChild)
             val focusingChildIndex = editTextViews.indexOf(focusedChild) + 1
@@ -229,6 +262,7 @@ class SmsCodeEditTextGroup @JvmOverloads constructor(
 
     override fun afterTextChanged(p0: Editable?) {}
 
+    /** вытравливает символы из каждой ячейки и создает строку с кодом, если onCodeEntered проинициализирован вызвает его с этой строкой, если нет выбрасывает исключение */
     private fun buildCode() {
         val isInputCompleted = editTextViews.none { it.text.isNullOrEmpty() }
         if (isInputCompleted) {
@@ -244,8 +278,10 @@ class SmsCodeEditTextGroup @JvmOverloads constructor(
         }
     }
 
+    /** возвращает текущую строку из символов в ячейках */
     fun getCurrentCode(): String = editTextViews.joinToString(separator = "") { it.text.toString() }
 
+    /** устанавливает код в View */
     fun setCode(code: String) {
         this.code = code
         for (charIndex in code.indices) {
@@ -262,6 +298,7 @@ class SmsCodeEditTextGroup @JvmOverloads constructor(
         editTextViews.forEach { it.clearFocus() }
     }
 
+    /** позволяет определить действие, которое будет выполняться, когда код введен полностью */
     fun setOnCodeEntered(f: (code: String) -> Unit) {
         onCodeEntered = f
     }
@@ -310,6 +347,7 @@ class SmsCodeEditTextGroup @JvmOverloads constructor(
         }
     }
 
+    /** отвечает за сохранение информации при изменении параметров экрана */
     private class SavedState : BaseSavedState, Parcelable {
         var savedCode = ""
         var savedInputState = 0
@@ -336,6 +374,7 @@ class SmsCodeEditTextGroup @JvmOverloads constructor(
         }
     }
 
+    /** Кастомный AppCompatEditText. Использует проинициализированные/сохраненные значения для определения вида ячейки. Устанавливает кастомный ConnectionWrapper */
     private inner class SmsCodeEditText(context: Context, attrs: AttributeSet?, defStyleAttr: Int) :
         androidx.appcompat.widget.AppCompatEditText(context, attrs, defStyleAttr) {
         init {
@@ -365,31 +404,31 @@ class SmsCodeEditTextGroup @JvmOverloads constructor(
             }
         }
 
-
-        override fun onCreateInputConnection(outAttrs: EditorInfo?): InputConnection {
+        override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection {
             return SCETGInputConnectionWrapper(
-                super.onCreateInputConnection(outAttrs),
+                super.onCreateInputConnection(outAttrs)!!,
                 true
             )
         }
     }
 
+    /** Используется для того, чтобы слушать нажатие backspace с клавиатуры */
     private inner class SCETGInputConnectionWrapper(target: InputConnection, mutable: Boolean) :
         InputConnectionWrapper(target, mutable) {
         override fun sendKeyEvent(event: KeyEvent?): Boolean {
-            if (event?.action == KeyEvent.ACTION_UP
-                && event.keyCode == KeyEvent.KEYCODE_DEL
+            if (event?.action == KeyEvent.ACTION_UP &&
+                event.keyCode == KeyEvent.KEYCODE_DEL
             ) {
                 if (inputState != STATE_INPUT && inputState != STATE_CORRECT) {
                     setDefaultInputState()
                 }
-
+                // перекидываем фокус с текущего элемента (focusedChild) на элемент назад (addressingEditText), стираем символ в нем
                 val focusedChild = focusedChild as EditText?
                 if (focusedChild != null && focusedChild.text.toString() == "") {
                     val addressingEditTextIndex = editTextViews.indexOf(focusedChild) - 1
                     if (addressingEditTextIndex >= 0) {
                         editTextViews[addressingEditTextIndex].requestFocus()
-                        editTextViews[addressingEditTextIndex].setSelection(1)
+                        editTextViews[addressingEditTextIndex].setText("")
                         return false
                     }
                 }
